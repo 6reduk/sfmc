@@ -1,0 +1,6 @@
+PyJWT
+requests
+zeep
+lxml==3.7.3
+suds-jurko
+
