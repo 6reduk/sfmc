@@ -5,7 +5,7 @@ with open('README.md') as f:
 
 setup(
     name='sfmc',
-    version='0.1.2',
+    version='0.1.3',
     description='Salesforce Marketing Cloud client for Python',
     long_description=readme,
     author='Dmitriy Shestakov',
@@ -19,7 +19,7 @@ setup(
     install_requires=[
         'pyjwt>=1.5.3',
         'requests>=2.18.4',
-        'lxml==3.7.3',
+        'lxml>=4.2.5',
         'suds-jurko==0.6',
     ],
     test_suite="tests",
