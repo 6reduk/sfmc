@@ -1,6 +1,6 @@
 PyJWT
 requests
 zeep
-lxml==3.7.3
+lxml>=4.2.5
 suds-jurko
 
