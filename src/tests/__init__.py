@@ -9,8 +9,7 @@ class TestCase(unittest.TestCase):
     Base class for any sfmc unit tests
     """
 
-    mc_config = None
-
+    mc_config: dict = None
 
     @classmethod
     def get_mc_credentials(cls):
@@ -20,5 +19,3 @@ class TestCase(unittest.TestCase):
                 cls.mc_config = json.load(f)
 
         return cls.mc_config
-
-

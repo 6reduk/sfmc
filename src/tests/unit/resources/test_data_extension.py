@@ -19,8 +19,6 @@ class DataExtension(TestCase):
 
     @unittest.skip('Need account with special rights')
     def test_create_data_extension(self):
-        cl = self.get_mc_client()
-        print(cl)
         self.assertTrue(False)
 
     @unittest.skip('Need account with special rights')

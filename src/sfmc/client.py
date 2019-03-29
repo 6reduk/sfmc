@@ -9,91 +9,7 @@ from suds.wsse import Security, UsernameToken
 from suds.sax.element import Element
 from .exceptions import ConfigureError, AuthenticationError, APIRequestError, SOAPRequestError
 from .resources.filter import SearchFilter
-
-
-class ClientFactory:
-    """Produce Sales Force client"""
-    def __init__(self):
-        self._params = {}
-        self._resource_bindings = {}
-
-    def bind_resource(self, handler):
-        """Bind resource to handler"""
-        self._resource_bindings[handler.get_resource_name()] = handler
-
-        return self
-
-    def set_params(self, params, override=False):
-        if not isinstance(params, dict):
-            raise ValueError('params must be a dictionary')
-
-        if override:
-            self._params = params
-        else:
-            self._params.update(params)
-
-    def make(self):
-        # For all available client options see Client constructor method
-        client = Client()
-
-        client.resource_handlers_map = self._resource_bindings
-
-        if self._params.get('client_id') not in (None, ''):
-            client.client_id = self._params.get('client_id')
-        else:
-            raise ConfigureError('client_id is required and must has not empty value.')
-
-        if self._params.get('client_secret') not in (None, ''):
-            client.client_secret = self._params.get('client_secret')
-        else:
-            raise ConfigureError('client_secret is required and must has not empty value.')
-
-        if self._params.get('endpoint') not in (None, ''):
-            client.endpoint = self._params.get('endpoint')
-
-        if self._params.get('appsignature') not in (None, ''):
-            client.appsignature = self._params.get('appsignature')
-
-        auth_token = self._params.get('auth_token')
-        auth_token_expiration = self._params.get('auth_token_expiration')
-        auth_legacy_token = self._params.get('auth_legacy_token')
-        auth_refresh_token = self._params.get('auth_refresh_token')
-
-        if all(map(lambda x: x is not None, [auth_token, auth_token_expiration, auth_legacy_token])):
-            client.auth_token = auth_token
-            client.auth_token_expiration = auth_token_expiration
-            client.auth_legacy_token = auth_legacy_token
-            if auth_refresh_token is not None:
-                client.auth_refresh_token = auth_refresh_token
-        elif any(map(lambda x: x is not None, [auth_token, auth_token_expiration, auth_legacy_token])):
-            raise ConfigureError(
-                'auth_token, auth_token_expiration, auth_legacy_token must be presented together and not to have empty value')
-
-        if self._params.get('wsdl_local_path') not in (None, ''):
-            client.wsdl_local_path = self._params.get('wsdl_local_path')
-        else:
-            raise ConfigureError('wsdl_local_path is required and must has not empty value')
-
-        if self._params.get('wsdl_url') not in (None, ''):
-            client.wsdl_url = self._params.get('wsdl_url')
-
-        if self._params.get('user_agent') not in (None, ''):
-            client.user_agent = self._params.get('user_agent')
-
-        if self._params.get('debug') not in (None, ''):
-            debug_flag = True if self._params.get('debug') in ('1', 'true', 'True', True) else False
-            client.set_debug(debug_flag)
-
-        client.init()
-
-        return client
-
-    def __repr__(self):
-        txt = '<[{obj_class}][params:{params}][bindings:{bindings}]>'
-        handlers_repr = []
-        for k, v in self._resource_bindings.items():
-            handlers_repr.append('{}->{}'.format(k, v.__name__))
-        return txt.format(obj_class=self.__class__.__name__, params=self._params, bindings=",".join(handlers_repr))
+from .resources import ResourceHandler
 
 
 class Client:
@@ -123,24 +39,42 @@ class Client:
         self._debug = False
 
     def _download_wsdl(self, wsdl_url, local_path):
+        """
+        Download wsdl file
+        :param wsdl_url:        url where file located
+        :param local_path:      where store file
+        :return:
+        """
         with open(local_path, 'w') as of:
             r = requests.get(wsdl_url)
             of.write(r.text)
 
-    def _local_wsdl_is_expired(self, local_path):
+    def _local_wsdl_is_expired(self, local_path: str) -> bool:
+        """
+        Check wsdl file expiration
+        :param local_path:      path to wsdl file
+        :return:
+        """
         ts = time.mktime(time.gmtime(os.path.getmtime(local_path)))
         d = time.mktime(datetime.datetime.now().timetuple())
 
         return ts + self.wsdl_local_file_expire_timeout < d
 
     def fetch_wsdl(self):
+        """
+        Retrieve and store wsdl file
+        """
         if not os.path.exists(self.wsdl_local_path) \
                 or os.path.getsize(self.wsdl_local_path) == 0 \
                 or self._local_wsdl_is_expired(self.wsdl_local_path):
             self._download_wsdl(self.wsdl_url, self.wsdl_local_path)
         self._wsdl_local_file_url = 'file:///' + self.wsdl_local_path
 
-    def _auth_token_expired(self):
+    def _auth_token_expired(self) -> bool:
+        """
+        Check auth token expire time
+        :return: is expired
+        """
         if self.auth_token is None:
             return True
 
@@ -153,6 +87,9 @@ class Client:
         return False
 
     def refresh_token(self):
+        """
+        Refresh auth token
+        """
         if not self._auth_token_expired():
             return
 
@@ -182,6 +119,7 @@ class Client:
             self.auth_refresh_token = response_body['refreshToken']
 
     def _detect_endpoint(self):
+        """Detect soap-service end point"""
         url = 'https://www.exacttargetapis.com/platform/v1/endpoints/soap?access_token=' + self.auth_token
         headers = {'user-agent': self.user_agent}
 
@@ -194,6 +132,7 @@ class Client:
             raise APIRequestError('Unable to determine endpoints stack: ' + str(e))
 
     def build_soap_client(self):
+        """Build and configure soap client"""
         if self.endpoint is None:
             self.endpoint = self._detect_endpoint()
 
@@ -220,6 +159,9 @@ class Client:
             logging.getLogger('suds').setLevel(logging.INFO)
 
     def init(self):
+        """
+        Prepare client to work
+        """
         self.fetch_wsdl()
         self.refresh_token()
         self.build_soap_client()
@@ -233,10 +175,17 @@ class Client:
 
         return self.resource_handlers[item]
 
-    def set_debug(self, debug):
+    def set_debug(self, debug) -> 'Client':
         self._debug = debug
 
-    def soap_describe_object(self, obj_type):
+        return self
+
+    def soap_describe_object(self, obj_type: str):
+        """
+        Get object definition
+        :param obj_type: Resource type described at wsdl
+        :return:
+        """
         self.refresh_token()
 
         request = self.soap_client.factory.create('ArrayOfObjectDefinitionRequest')
@@ -251,7 +200,15 @@ class Client:
 
         return response
 
-    def soap_get(self, obj_type, search_filter=None, props=None, options=None):
+    def soap_get(self, obj_type: str, search_filter: SearchFilter = None, props: list = None, options: dict = None):
+        """
+        Get single object or array of objects by soap request
+        :param obj_type: requested object type
+        :param search_filter: search filter
+        :param props: requested object fields
+        :param options: additional request option
+        :return: service response
+        """
         self.refresh_token()
 
         request = self.soap_client.factory.create('RetrieveRequest')
@@ -310,7 +267,13 @@ class Client:
 
         return self.soap_client.service.Retrieve(request)
 
-    def parse_props_dict_into_ws_object(self, obj_type, props_dict):
+    def parse_props_dict_into_ws_object(self, obj_type: str, props_dict: dict):
+        """
+        Build request payload for web service
+        :param obj_type:    object type described at wsdl
+        :param props_dict:  target object properties
+        :return: web service object
+        """
         ws_object = self.soap_client.factory.create(obj_type)
         for k, v in props_dict.items():
             if k in ws_object:
@@ -321,6 +284,12 @@ class Client:
         return ws_object
 
     def parse_props_into_ws_object(self, obj_type, props):
+        """
+        Build request payload for web service
+        :param obj_type:    object type described at wsdl
+        :param props:  dict with target object property description or list of dict
+        :return: web service object
+        """
         if isinstance(props, dict):
             ws_object = self.parse_props_dict_into_ws_object(obj_type, props)
         elif isinstance(props, list):
@@ -331,17 +300,137 @@ class Client:
 
         return ws_object
 
-    def soap_post(self, obj_type, props):
+    def soap_post(self, obj_type: str, props):
+        """
+        Create request
+        :param obj_type: object type described
+        :param props:   dict|list   target object field in ws format
+        :return: ws response
+        """
         payload = self.parse_props_into_ws_object(obj_type, props)
 
         return self.soap_client.service.Create(None, payload)
 
-    def soap_patch(self, obj_type, props):
+    def soap_patch(self, obj_type: str, props):
+        """
+        Update request
+        :param obj_type: object type described
+        :param props:   dict|list   target object field in ws format
+        :return: ws response
+        """
         payload = self.parse_props_into_ws_object(obj_type, props)
 
         return self.soap_client.service.Update(None, payload)
 
     def soap_delete(self, obj_type, props):
+        """
+        Delete object
+        :param obj_type: object type described
+        :param props:   dict|list   target object field in ws format
+        :return: ws response
+        """
         payload = self.parse_props_into_ws_object(obj_type, props)
 
         return self.soap_client.service.Delete(None, payload)
+
+
+class ClientFactory:
+    """Produce Sales Force client"""
+
+    def __init__(self):
+        self._params = {}
+        self._resource_bindings = {}
+
+    def bind_resource(self, handler: ResourceHandler) -> 'ClientFactory':
+        """
+        Bind resource handler
+        :param handler: resource handler
+        :return:
+        """
+        self._resource_bindings[handler.get_resource_name()] = handler
+
+        return self
+
+    def set_params(self, params: dict, override=False) -> 'ClientFactory':
+        """
+
+        :param params:
+        :param override: indicates about need override all previous params by given
+        :return:
+        """
+        if not isinstance(params, dict):
+            raise ValueError('params must be a dictionary')
+
+        if override:
+            self._params = params
+        else:
+            self._params.update(params)
+
+        return self
+
+    def make(self) -> Client:
+        """
+        Build Sales Force Client
+        :return: Client
+        """
+        # For all available client options see Client constructor method
+        client = Client()
+
+        client.resource_handlers_map = self._resource_bindings
+
+        if self._params.get('client_id') not in (None, ''):
+            client.client_id = self._params.get('client_id')
+        else:
+            raise ConfigureError('client_id is required and must has not empty value.')
+
+        if self._params.get('client_secret') not in (None, ''):
+            client.client_secret = self._params.get('client_secret')
+        else:
+            raise ConfigureError('client_secret is required and must has not empty value.')
+
+        if self._params.get('endpoint') not in (None, ''):
+            client.endpoint = self._params.get('endpoint')
+
+        if self._params.get('appsignature') not in (None, ''):
+            client.appsignature = self._params.get('appsignature')
+
+        auth_token = self._params.get('auth_token')
+        auth_token_expiration = self._params.get('auth_token_expiration')
+        auth_legacy_token = self._params.get('auth_legacy_token')
+        auth_refresh_token = self._params.get('auth_refresh_token')
+
+        if all(map(lambda x: x is not None, [auth_token, auth_token_expiration, auth_legacy_token])):
+            client.auth_token = auth_token
+            client.auth_token_expiration = auth_token_expiration
+            client.auth_legacy_token = auth_legacy_token
+            if auth_refresh_token is not None:
+                client.auth_refresh_token = auth_refresh_token
+        elif any(map(lambda x: x is not None, [auth_token, auth_token_expiration, auth_legacy_token])):
+            raise ConfigureError(
+                'auth_token, auth_token_expiration, auth_legacy_token must be presented together and have no empty value')
+
+        if self._params.get('wsdl_local_path') not in (None, ''):
+            client.wsdl_local_path = self._params.get('wsdl_local_path')
+        else:
+            raise ConfigureError('wsdl_local_path is required and must has not empty value')
+
+        if self._params.get('wsdl_url') not in (None, ''):
+            client.wsdl_url = self._params.get('wsdl_url')
+
+        if self._params.get('user_agent') not in (None, ''):
+            client.user_agent = self._params.get('user_agent')
+
+        if self._params.get('debug') not in (None, ''):
+            debug_flag = True if self._params.get('debug') in ('1', 'true', 'True', True) else False
+            client.set_debug(debug_flag)
+
+        client.init()
+
+        return client
+
+    def __repr__(self):
+        txt = '<[{obj_class}][params:{params}][bindings:{bindings}]>'
+        handlers_repr = []
+        for k, v in self._resource_bindings.items():
+            handlers_repr.append('{}->{}'.format(k, v.__name__))
+        return txt.format(obj_class=self.__class__.__name__, params=self._params, bindings=",".join(handlers_repr))
