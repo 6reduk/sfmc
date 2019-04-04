@@ -35,3 +35,56 @@ def sobject_to_dict(obj, key_to_lower=False, json_serialize=False):
 def suds_results_to_simple_types(results):
     return [sobject_to_dict(d) for d in results]
 
+
+def check_required_keys(params, required, pass_empty=True):
+    provided = set()
+
+    def check_empty(f):
+        if pass_empty is False and f == '':
+            return False
+
+        return True
+
+    for key, value in params.items():
+        if value is not None and check_empty(value):
+            provided.add(key)
+
+    missing = set(required) - set(provided)
+
+    if len(missing) > 0:
+        raise Exception(f"missing required keys: {missing} in {params}")
+
+
+def all_keys_not_none(d: dict, required: list):
+    """
+    Check all values for given keys is not None
+    :param d:
+    :param required:
+    :return:
+    """
+    passed = 0
+    for r in required:
+        v = d.get(r)
+        if v is not None:
+            passed += 1
+
+    return len(required) == passed
+
+
+def any_keys_not_none(d: dict, required: list):
+    """
+    Check although 1 element is not None but not all required
+    :param d:
+    :param required:
+    :return:
+    """
+    passed = 0
+    for r in required:
+        v = d.get(r)
+        if v is not None:
+            passed += 1
+
+    if len(required) == 1 and passed == len(required):  # Exclusion for sequence with 1 element
+        return True
+
+    return 0 < passed < len(required)

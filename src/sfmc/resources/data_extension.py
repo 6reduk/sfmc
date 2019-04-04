@@ -1,11 +1,11 @@
-from . import ResourceBase, ResourceHandler
-from ..exceptions import ResourceHandlerException, ResourceMissingPropertyException
+from typing import List, Mapping, Any, Union
+from sfmc.client import ResourceBase, ResourceHandler, Entity
+from ..exceptions import ResourceHandlerException
 from .filter import SearchFilter
 
 
 class DataExtensionResource(ResourceBase):
-    """Data extension resource"""
-    # TODO code logic
+    """Resource wrapper for DataExtension entities"""
     pass
 
 
@@ -14,7 +14,7 @@ class DataExtensionHandler(ResourceHandler):
     resource_type = 'DataExtension'
     resource_base = DataExtensionResource
 
-    def get(self, m_filter: SearchFilter = None, m_props: list = None, m_options: dict = None) -> DataExtensionResource:
+    def get(self, m_filter: SearchFilter = None, m_props: list = None, m_options: dict = None) -> ResourceBase:
         """
         Get data extensions
         :param m_filter:    filter
@@ -25,16 +25,16 @@ class DataExtensionHandler(ResourceHandler):
 
         if m_props is None:
             try:
-                m_props = [prop.Name for prop in self.describe().retrievable_properties()]
+                m_props = self.describe().retrievable_property_names()
             except Exception as e:
                 raise ResourceHandlerException('Can not describe object: {}'.format(e))
 
         if m_options is not None and type(m_options) is not dict:
             raise ResourceHandlerException('options must be a dict')
 
-        response = self.client.soap_get(self.get_resource_type(), m_filter, m_props, m_options)
+        resp = self.client.soap_get(self.get_resource_type(), m_filter, m_props, m_options)
 
-        return DataExtensionResource.make_from_response(response)
+        return self.make_resource(resp)
 
     def name_for_customer_key(self, key: str) -> str:
         """
@@ -46,14 +46,17 @@ class DataExtensionHandler(ResourceHandler):
 
         f = SearchFilter.equals('CustomerKey', key)
 
-        response = self.client.soap_get(self.get_resource_type(), search_filter=f, props=props)
+        res = self.get(m_filter=f, m_props=props)
 
-        d = DataExtensionResource.make_from_response(response)
+        if not res.is_valid:
+            msg = 'Can not determine name for key{}: invalid service response[{}]'.format(key, res)
+            raise ResourceHandlerException(msg)
 
-        if d.status and len(d.results) == 1 and 'Name' in d.results[0]:
-            return d.results[0]['Name']
-        else:
-            raise ResourceHandlerException('Unable to retrieve DataExtension name for customer key: {}'.format(key))
+        if res.is_empty:
+            msg = 'Can not determine name for key[{}]:result set is empty, resource: {}'.format(key, res)
+            raise ResourceHandlerException(msg)
+
+        return res.entities[0].Name
 
     def customer_key_for_name(self, name: str) -> str:
         """
@@ -65,36 +68,39 @@ class DataExtensionHandler(ResourceHandler):
 
         f = SearchFilter.equals('Name', name)
 
-        response = self.client.soap_get(self.get_resource_type(), search_filter=f, props=props)
+        res = self.get(m_filter=f, m_props=props)
 
-        d = DataExtensionResource.make_from_response(response)
+        if not res.is_valid:
+            msg = 'Can not determine key for name{}: invalid service response[{}]'.format(name, res)
+            raise ResourceHandlerException(msg)
 
-        if d.status and len(d.results) == 1 and 'CustomerKey' in d.results[0]:
-            return d.results[0]['CustomerKey']
-        else:
-            raise ResourceHandlerException('Unable to retrieve DataExtension customer key for name: {}'.format(name))
+        if res.is_empty:
+            msg = 'Can not determine key for name[{}]:result set is empty, resource: {}'.format(name, res)
+            raise ResourceHandlerException(msg)
+
+        return res.entities[0].CustomerKey
 
 
 class DataExtensionField(ResourceBase):
-    def field_names(self) -> list:
-        """List of field names"""
-        return [f['Name'] for f in self.results]
+    """Resource wrapper for data extension field entities"""
+    pass
 
 
 class DataExtensionFieldHandler(ResourceHandler):
+    """Data extension field handler"""
     resource_type = 'DataExtensionField'
     resource_base = DataExtensionField
 
     def __init__(self, client):
-        self.customer_key = None
+        self.customer_key: str = None
         super(DataExtensionFieldHandler, self).__init__(client)
 
-    def set_customer_key(self, key):
+    def set_customer_key(self, key: str) -> 'DataExtensionFieldHandler':
         self.customer_key = key
 
         return self
 
-    def get(self, customer_key=None, m_props=None):
+    def get(self, customer_key: str = None, m_props: List[str] = None) -> ResourceBase:
         if customer_key is None:
             customer_key = self.customer_key
 
@@ -102,57 +108,73 @@ class DataExtensionFieldHandler(ResourceHandler):
             props = m_props
         else:
             try:
-                props = [prop.Name for prop in self.describe().retrievable_properties()]
+                props = self.describe().retrievable_property_names()
             except Exception as e:
                 raise ResourceHandlerException('Can not describe object: {}'.format(e))
 
         f = SearchFilter.equals('DataExtension.CustomerKey', customer_key)
 
-        response = self.client.soap_get(self.get_resource_type(), search_filter=f, props=props)
+        res = self.client.soap_get(self.get_resource_type(), search_filter=f, props=props)
 
-        return self.resource_base.make_from_response(response)
+        return self.make_resource(res)
+
+
+class DataExtensionRowEntity(Entity):
+
+    def __getattr__(self, item) -> Any:
+        if item == 'Properties':
+            if not self.has_properties():
+                raise AttributeError('No such attribute [{}]'.format(item))
+            return self.get_properties()
+
+        if item in self.properties:
+            return self.properties[item].Value
+
+        if item not in self.data:
+            raise AttributeError('No such attribute [{}]'.format(item))
+
+        return self.data[item]
+
+    def payload(self):
+        return {p.Name: p.Value for p in self.properties.values()}
 
 
 class DataExtensionRow(ResourceBase):
-
-    def get_property(self, property_name):
-        for p in self.properties()[0]:
-            if p.Name == property_name:
-                return p.Value
-
-        raise ResourceMissingPropertyException('Property [{}] is missing in result set'.format(property_name))
+    """Resource wrapper for data extension row entities"""
+    entity_factory = DataExtensionRowEntity
 
 
 class DataExtensionRowHandler(ResourceHandler):
+    """Data extension row handler"""
     resource_type = 'DataExtensionObject'
+    resource_name = 'DataExtensionRow'
     resource_base = DataExtensionRow
 
     def __init__(self, client):
-        self.customer_key = None
-        self.name = None
+        self.customer_key: str = None
+        self.name: str = None
         super(DataExtensionRowHandler, self).__init__(client)
 
-    @classmethod
-    def get_resource_name(cls):
-        return 'DataExtensionRow'
-
-    def set_customer_key(self, key):
+    def set_customer_key(self, key: str) -> 'DataExtensionRowHandler':
         self.customer_key = key
 
         return self
 
-    def set_name(self, name):
+    def set_name(self, name: str) -> 'DataExtensionRowHandler':
         self.name = name
 
         return self
 
-    def get(self, m_filter=None, m_props=None, m_options=None):
+    def get(self, m_filter: SearchFilter = None, m_props: List[str] = None,
+            m_options: Mapping[str, Any] = None) -> ResourceBase:
+        """Get data extension rows(objects)"""
         res_type = "{}[{}]".format(self.get_resource_type(), self.name)
-        response = self.client.soap_get(res_type, search_filter=m_filter, props=m_props, options=m_options)
 
-        return self.make_resource_from_response(response)
+        resp = self.client.soap_get(res_type, search_filter=m_filter, props=m_props, options=m_options)
 
-    def _convert_props_to_service_scheme(self, customer_key, props):
+        return self.make_resource(resp)
+
+    def _convert_props_to_scheme(self, customer_key: str, props: Mapping[str, Any]) -> Mapping[str, Any]:
         fields = []
         converted = {}
 
@@ -165,7 +187,7 @@ class DataExtensionRowHandler(ResourceHandler):
 
         return converted
 
-    def _convert_props_to_service_scheme_for_delete(self, customer_key, props):
+    def _convert_props_to_scheme_for_delete(self, customer_key: str, props: Mapping[str, Any]) -> Mapping[str, Any]:
         fields = []
         converted = {}
 
@@ -178,10 +200,11 @@ class DataExtensionRowHandler(ResourceHandler):
 
         return converted
 
-    def _prepare_properties_payload(self, props, customer_key, to_delete=False):
+    def _prepare_properties_payload(self, props: Union[Mapping[str, Any], List[Mapping[str, Any]]], customer_key: str,
+                                    to_delete: bool = False) -> Union[Mapping[str, Any], List[Mapping[str, Any]]]:
         customer_key = customer_key if customer_key is not None else self.customer_key
 
-        props_converter = self._convert_props_to_service_scheme if to_delete is False else self._convert_props_to_service_scheme_for_delete
+        props_converter = self._convert_props_to_scheme if to_delete is False else self._convert_props_to_scheme_for_delete
 
         if type(props) is list:
             payload_props = [props_converter(customer_key, i) for i in props]
@@ -190,20 +213,40 @@ class DataExtensionRowHandler(ResourceHandler):
 
         return payload_props
 
-    def add(self, props, customer_key=None):
+    def add(self, props: Union[Mapping[str, Any], List[Mapping[str, Any]]], customer_key: str = None) -> ResourceBase:
+        """
+        Create new rows with given props
+        :param props:   Single object properties or list of object properties
+        :param customer_key:    customer key
+        :return: resource
+        """
         payload = self._prepare_properties_payload(props, customer_key)
-        response = self.client.soap_post(self.get_resource_type(), payload)
+        resp = self.client.soap_post(self.get_resource_type(), payload)
 
-        return self.make_resource_from_response(response)
+        return self.make_resource(resp)
 
-    def update(self, props, customer_key=None):
+    def update(self, props: Union[Mapping[str, Any], List[Mapping[str, Any]]],
+               customer_key: str = None) -> ResourceBase:
+        """
+        Update rows with given properties. Objects will found by index property
+        :param props:   Single object properties or list of object properties
+        :param customer_key:    customer key
+        :return: resource
+        """
         payload = self._prepare_properties_payload(props, customer_key)
-        response = self.client.soap_patch(self.get_resource_type(), payload)
+        resp = self.client.soap_patch(self.get_resource_type(), payload)
 
-        return self.make_resource_from_response(response)
+        return self.make_resource(resp)
 
-    def delete(self, props=None, customer_key=None):
+    def delete(self, props: Union[Mapping[str, Any], List[Mapping[str, Any]]] = None,
+               customer_key: str = None) -> ResourceBase:
+        """
+        Delete objects
+        :param props: Single object properties or list of object properties
+        :param customer_key: customer key
+        :return: resource
+        """
         payload = self._prepare_properties_payload(props, customer_key, to_delete=True)
-        response = self.client.soap_delete(self.get_resource_type(), payload)
+        resp = self.client.soap_delete(self.get_resource_type(), payload)
 
-        return self.make_resource_from_response(response)
+        return self.make_resource(resp)

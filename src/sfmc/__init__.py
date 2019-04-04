@@ -1,5 +1,5 @@
 import logging
-from .client import Client, ClientFactory
+from .client import Client, ClientFactory, ObjectDefinition, ObjectDefinitionProperty, ResourceBase, ResourceHandler
 from .resources.data_extension import DataExtensionHandler, DataExtensionRowHandler, DataExtensionFieldHandler
 from .resources.filter import SearchFilter
 
