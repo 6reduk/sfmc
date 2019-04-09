@@ -220,6 +220,7 @@ class DataExtensionRowHandler(ResourceHandler):
         :param customer_key:    customer key
         :return: resource
         """
+        customer_key = customer_key if customer_key is not None else self.customer_key
         payload = self._prepare_properties_payload(props, customer_key)
         resp = self.client.soap_post(self.get_resource_type(), payload)
 
@@ -233,6 +234,7 @@ class DataExtensionRowHandler(ResourceHandler):
         :param customer_key:    customer key
         :return: resource
         """
+        customer_key = customer_key if customer_key is not None else self.customer_key
         payload = self._prepare_properties_payload(props, customer_key)
         resp = self.client.soap_patch(self.get_resource_type(), payload)
 
@@ -246,6 +248,7 @@ class DataExtensionRowHandler(ResourceHandler):
         :param customer_key: customer key
         :return: resource
         """
+        customer_key = customer_key if customer_key is not None else self.customer_key
         payload = self._prepare_properties_payload(props, customer_key, to_delete=True)
         resp = self.client.soap_delete(self.get_resource_type(), payload)
 
