@@ -677,6 +677,9 @@ class Entity:
 
         return list(self.properties.values())
 
+    def __iter__(self) -> Iterable:
+        return iter(self.data)
+
     def __getattr__(self, item) -> Any:
         if item == 'Properties':
             if not self.has_properties():
