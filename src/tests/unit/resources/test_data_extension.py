@@ -1,9 +1,7 @@
-import os
 import uuid
 import unittest
-from tests import TestCase
+from tests import TestCase, INCLUDE_LONG_TESTS
 from sfmc import client_factory, Client, SearchFilter
-
 
 
 class DETestCase(TestCase):
@@ -17,6 +15,16 @@ class DETestCase(TestCase):
         creds = self.get_mc_credentials()
 
         return creds.get('default_de_key')
+
+
+class DEField(DETestCase):
+
+    def test_get_fields(self):
+        cl = self.get_mc_client()
+        cl.DataExtensionField.set_customer_key(self.get_de_key())
+        res = cl.DataExtensionField.get()
+        d = [e.Name for e in res.entities]
+        self.assertEqual(['C_ID', 'C_NAME', 'C_EMAIL'], d)
 
 
 class DataExtensionRowTest(DETestCase):
@@ -64,7 +72,7 @@ class DataExtensionRowTest(DETestCase):
         self.assertTrue(rows.is_valid)
         self.assertTrue(rows.is_empty)
 
-    @unittest.skipIf(bool(os.getenv('SKIP_LONG', False)), 'Too long test execution')
+    @unittest.skipUnless(INCLUDE_LONG_TESTS, 'Too long test execution')
     def test_get_more_available_results(self):
         props = ['C_ID', 'C_EMAIL', 'C_NAME']
         props_values = []

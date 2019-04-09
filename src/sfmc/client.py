@@ -3,7 +3,7 @@ import time
 import datetime
 import json
 import logging
-from typing import Mapping, Any, Dict, List, Iterable, Callable
+from typing import Mapping, Any, Dict, List, Iterable, Callable, MutableMapping
 
 import requests
 from suds.client import Client as SoapClient
@@ -706,7 +706,7 @@ class ObjectDefinition:
         self.raw_props = properties
         self.props = {p.Name: p for p in ObjectDefinitionProperty.make_from_seq(properties)}
 
-    def properties(self) -> Iterable[ObjectDefinitionProperty]:
+    def properties(self) -> MutableMapping[str, ObjectDefinitionProperty]:
         return self.props
 
     def get_property(self, name: str) -> ObjectDefinitionProperty:
@@ -718,7 +718,7 @@ class ObjectDefinition:
     def retrievable_properties(self) -> List[ObjectDefinitionProperty]:
         """Properties retrievable from API"""
         target = []
-        for p in self.properties():
+        for p in self.properties().values():
             # skip unexpected IsPlatformObject property cause it's not declared at wsdl schema and
             # it's impossible to request this property
             if p.Name == 'IsPlatformObject' or not p.IsRetrievable:

@@ -1,7 +1,8 @@
-import sys
 import os
 import unittest
 import json
+
+INCLUDE_LONG_TESTS = bool(os.getenv('LONG_TESTS', False))
 
 
 class TestCase(unittest.TestCase):
