@@ -1,4 +1,6 @@
 import os
+import os.path
+import pathlib
 import time
 import datetime
 import json
@@ -44,6 +46,8 @@ class Authenticator:
         self.auth_refresh_token = None
         self.appsignature = None
         self.auth_token = None
+        self.last_refresh_ts = time.time()
+        self.refresh_delay = 60 * 10  # 10 minutes
 
     def refresh(self, force=False):
         if self.auth_expired() or force:
@@ -109,10 +113,10 @@ class Authenticator:
         if self.auth_token is None:
             return True
 
-        if self.auth_token_expiration is None:
+        if self.auth_token_expiration is None or self.auth_token_expiration < time.time() + 300:
             return True
 
-        if self.auth_token_expiration < time.time() + 300:
+        if self.last_refresh_ts + self.refresh_delay < time.time():
             return True
 
         return False
@@ -133,10 +137,14 @@ class SoapClientFactory:
         """
         Download wsdl file
         :param wsdl_url:        url where file located
-        :param local_path:      where store file
+        :param local_path:      full qualified path where store file
         :return:
         """
-        # TODO add logic for create folder where store wsdl file
+        # check path
+        p = pathlib.Path(os.path.dirname(local_path))
+        if not p.exists():
+            p.mkdir(parents=True)
+
         with open(local_path, 'w') as of:
             r = requests.get(url)
             of.write(r.text)
