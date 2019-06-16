@@ -1,15 +1,10 @@
 import uuid
 import unittest
 from tests import TestCase, INCLUDE_LONG_TESTS
-from sfmc import client_factory, Client, SearchFilter
+from sfmc import SearchFilter
 
 
 class DETestCase(TestCase):
-    def get_mc_client(self) -> Client:
-        creds = self.get_mc_credentials()
-        client_factory.set_params(creds)
-
-        return client_factory.make()
 
     def get_de_key(self) -> str:
         creds = self.get_mc_credentials()
