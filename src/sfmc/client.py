@@ -12,10 +12,10 @@ from suds.client import Client as SoapClient
 from suds.wsse import Security, UsernameToken
 from suds.sax.element import Element
 
-from .exceptions import (ConfigureError, AuthenticationError, APIRequestError, SOAPRequestError,
-                         ResourceMissingPropertyException, NoMoreDataAvailable, ResourceHandlerException)
-from .util import check_required_keys, all_keys_not_none, any_keys_not_none, suds_results_to_simple_types
-from .resources.filter import SearchFilter
+from sfmc.exceptions import (ConfigureError, AuthenticationError, APIRequestError, SOAPRequestError,
+                             ResourceMissingPropertyException, NoMoreDataAvailable, ResourceHandlerException)
+from sfmc.util import check_required_keys, all_keys_not_none, any_keys_not_none, suds_results_to_simple_types
+from sfmc.resources.filter import SearchFilter
 
 DEFAULT_USER_AGENT = 'sfmc'
 DEFAULT_AUTH_URL = 'https://auth.exacttargetapis.com/v1/requestToken?legacy=1'
@@ -511,6 +511,10 @@ class ClientFactory:
         self._resource_bindings[handler.get_resource_name()] = handler
 
         return self
+
+    def bind_resources(self, handlers: List['ResourceHandler']) -> 'ClientFactory':
+        for h in handlers:
+            self.bind_resource(h)
 
     def set_params(self, params: dict, override=False) -> 'ClientFactory':
         """

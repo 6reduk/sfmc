@@ -1,7 +1,8 @@
 from typing import List, Mapping, Any, Union
 from sfmc.client import ResourceBase, ResourceHandler, Entity
-from ..exceptions import ResourceHandlerException
-from .filter import SearchFilter
+from sfmc.exceptions import ResourceHandlerException
+from sfmc.resources.filter import SearchFilter
+from sfmc.resources.mixins import Gettable
 
 
 class DataExtensionResource(ResourceBase):
@@ -9,32 +10,10 @@ class DataExtensionResource(ResourceBase):
     pass
 
 
-class DataExtensionHandler(ResourceHandler):
+class DataExtensionHandler(ResourceHandler, Gettable):
     """Data extension handler"""
     resource_type = 'DataExtension'
     resource_base = DataExtensionResource
-
-    def get(self, m_filter: SearchFilter = None, m_props: list = None, m_options: dict = None) -> ResourceBase:
-        """
-        Get data extensions
-        :param m_filter:    filter
-        :param m_props:     retrieve given props
-        :param m_options:   additional options
-        :return: DataExtensionResource
-        """
-
-        if m_props is None:
-            try:
-                m_props = self.describe().retrievable_property_names()
-            except Exception as e:
-                raise ResourceHandlerException('Can not describe object: {}'.format(e))
-
-        if m_options is not None and type(m_options) is not dict:
-            raise ResourceHandlerException('options must be a dict')
-
-        resp = self.client.soap_get(self.get_resource_type(), m_filter, m_props, m_options)
-
-        return self.make_resource(resp)
 
     def name_for_customer_key(self, key: str) -> str:
         """
