@@ -19,7 +19,7 @@ setup(
     install_requires=[
         'pyjwt>=1.5.3',
         'requests>=2.18.4',
-        'lxml==4.2.5',
+        'lxml==4.6.2',
         'suds-jurko==0.6',
     ],
     test_suite="tests",
